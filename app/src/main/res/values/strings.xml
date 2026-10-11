@@ -14,4 +14,13 @@
     <string name="no_media_selected">No se ha seleccionado ningún archivo</string>
     <string name="location_permission">Se necesita permiso de ubicación para mostrar tu posición</string>
     <string name="my_location">Mi ubicación</string>
+    <string name="light_sensor_value">Luminosidad: %1$.1f lux</string>
+    <string name="light_map_mode">Mapa claro</string>
+    <string name="dark_map_mode">Mapa oscuro</string>
+    <string name="light_sensor_unavailable">Sensor de luminosidad no disponible</string>
+    <string name="search_address">Buscar dirección</string>
+    <string name="address_example">Ej: Universidad Javeriana, Bogotá</string>
+    <string name="address_not_found">No se encontró la dirección</string>
+    <string name="address_search_error">No se pudo buscar la dirección</string>
+    <string name="search_button">Buscar</string>
 </resources>
