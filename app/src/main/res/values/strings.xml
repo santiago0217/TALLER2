@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">TALLER2</string>
+    <string name="open_camera">Abrir Cámara</string>
+    <string name="open_map">Abrir Mapa</string>
+    <string name="camera_title">Cámara y Galería</string>
+    <string name="map_title">Mapa</string>
+    <string name="photo">Foto</string>
+    <string name="video">Video</string>
+    <string name="take_photo">Tomar Foto</string>
+    <string name="record_video">Grabar Video</string>
+    <string name="select_photo">Seleccionar Foto</string>
+    <string name="select_video">Seleccionar Video</string>
+    <string name="camera_permission_denied">Se necesita permiso para utilizar la cámara</string>
+    <string name="no_media_selected">No se ha seleccionado ningún archivo</string>
+    <string name="location_permission">Se necesita permiso de ubicación para mostrar tu posición</string>
+    <string name="my_location">Mi ubicación</string>
 </resources>
