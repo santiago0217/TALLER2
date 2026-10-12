@@ -23,4 +23,6 @@
     <string name="address_not_found">No se encontró la dirección</string>
     <string name="address_search_error">No se pudo buscar la dirección</string>
     <string name="search_button">Buscar</string>
+    <string name="unknown_address">Dirección desconocida</string>
+    <string name="coordinates_label">Coordenadas: %1$.5f, %2$.5f</string>
 </resources>

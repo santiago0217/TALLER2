@@ -55,6 +55,15 @@ import java.util.Locale
 @SuppressLint("MissingPermission")
 @Composable
 fun MapScreen() {
+
+    var ubicacionLongClick by remember {
+        mutableStateOf<LatLng?>(null)
+    }
+
+    // null mientras el Geocoder todavía no responde
+    var direccionLongClick by remember {
+        mutableStateOf<String?>(null)
+    }
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val textoNoEncontrado = stringResource(
@@ -226,6 +235,47 @@ fun MapScreen() {
         }
     }
 
+    // GEOCODER INVERSO: DIRECCION A PARTIR DE UNA POSICION
+    val textoDireccionDesconocida = stringResource(
+        R.string.unknown_address
+    )
+
+    fun buscarDireccionInversa(posicion: LatLng) {
+
+        ubicacionLongClick = posicion
+        direccionLongClick = null
+
+        searchScope.launch {
+
+            val direccionEncontrada = try {
+
+                val resultados = withContext(Dispatchers.IO) {
+
+                    @Suppress("DEPRECATION")
+                    Geocoder(
+                        context,
+                        Locale("es", "CO")
+                    ).getFromLocation(
+                        posicion.latitude,
+                        posicion.longitude,
+                        1
+                    )
+                }
+
+                resultados?.firstOrNull()?.getAddressLine(0)
+                    ?: textoDireccionDesconocida
+
+            } catch (_: Exception) {
+                textoDireccionDesconocida
+            }
+
+            // Evita actualizar el marcador si hubo otro LongClick
+            if (ubicacionLongClick == posicion) {
+                direccionLongClick = direccionEncontrada
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         if (!permissionGranted) {
             Text(
@@ -290,7 +340,10 @@ fun MapScreen() {
         GoogleMap(
             modifier = Modifier.weight(1f),
             cameraPositionState = cameraPositionState,
-            properties = mapProperties
+            properties = mapProperties,
+            onMapLongClick = { posicion ->
+                buscarDireccionInversa(posicion)
+            }
         ) {
             currentLocation?.let { location ->
                 Marker(
@@ -312,6 +365,30 @@ fun MapScreen() {
                     state = rememberUpdatedMarkerState(position = posicion),
                     title = nombreUbicacion
                 )
+            }
+
+            ubicacionLongClick?.let { posicion ->
+
+                val markerState = rememberUpdatedMarkerState(
+                    position = posicion
+                )
+                val coordenadas = stringResource(
+                    R.string.coordinates_label,
+                    posicion.latitude,
+                    posicion.longitude
+                )
+                val titulo = direccionLongClick ?: coordenadas
+
+                Marker(
+                    state = markerState,
+                    title = titulo,
+                    snippet = coordenadas
+                )
+
+                // Abre (o refresca) la ventana de información con la dirección
+                LaunchedEffect(posicion, titulo) {
+                    markerState.showInfoWindow()
+                }
             }
         }
     }
