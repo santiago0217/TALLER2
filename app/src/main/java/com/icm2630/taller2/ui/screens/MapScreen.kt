@@ -1,5 +1,6 @@
 package com.icm2630.taller2.ui.screens
 
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -276,7 +277,12 @@ fun MapScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+
+        // Mensaje si no hay permiso de ubicacion
         if (!permissionGranted) {
             Text(
                 text = stringResource(R.string.location_permission),
@@ -285,6 +291,7 @@ fun MapScreen() {
             )
         }
 
+        // INFORMACION DEL SENSOR DE LUMINOSIDAD
         Surface(
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.fillMaxWidth()
@@ -294,49 +301,118 @@ fun MapScreen() {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (lightSensor == null) {
-                    Text(text = stringResource(R.string.light_sensor_unavailable))
-                } else {
-                    Text(text = stringResource(R.string.light_sensor_value, luminosidad))
                     Text(
                         text = stringResource(
-                            if (modoOscuro) R.string.dark_map_mode else R.string.light_map_mode
+                            R.string.light_sensor_unavailable
+                        )
+                    )
+                } else {
+                    Text(
+                        text = stringResource(
+                            R.string.light_sensor_value,
+                            luminosidad
+                        )
+                    )
+
+                    Text(
+                        text = stringResource(
+                            if (modoOscuro)
+                                R.string.dark_map_mode
+                            else
+                                R.string.light_map_mode
                         )
                     )
                 }
             }
         }
 
-        OutlinedTextField(
-            value = direccion,
-            onValueChange = { direccion = it },
-            label = { Text(stringResource(R.string.search_address)) },
-            placeholder = { Text(stringResource(R.string.address_example)) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { buscarDireccion() })
-        )
-
-        Button(
-            onClick = { buscarDireccion() },
-            enabled = !buscando && direccion.isNotBlank(),
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(bottom = 8.dp)
+        // BUSCADOR DE DIRECCIONES
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(text = stringResource(R.string.search_button))
+            Column(
+                modifier = Modifier.padding(
+                    horizontal = 12.dp,
+                    vertical = 8.dp
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+
+                OutlinedTextField(
+                    value = direccion,
+                    onValueChange = { direccion = it },
+                    label = {
+                        Text(stringResource(R.string.search_address))
+                    },
+                    placeholder = {
+                        Text(stringResource(R.string.address_example))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor =
+                            MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor =
+                            MaterialTheme.colorScheme.onSurface,
+
+                        focusedContainerColor =
+                            MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor =
+                            MaterialTheme.colorScheme.surface,
+
+                        focusedBorderColor =
+                            MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor =
+                            MaterialTheme.colorScheme.outline,
+
+                        focusedLabelColor =
+                            MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+
+                        focusedPlaceholderColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        unfocusedPlaceholderColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+
+                        cursorColor =
+                            MaterialTheme.colorScheme.primary
+                    ),
+
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            buscarDireccion()
+                        }
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        buscarDireccion()
+                    },
+                    enabled = direccion.isNotBlank() && !buscando
+                ) {
+                    Text(stringResource(R.string.search_button))
+                }
+
+                mensajeBusqueda?.let { mensaje ->
+                    Text(
+                        text = mensaje,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
         }
 
-        mensajeBusqueda?.let { mensaje ->
-            Text(
-                text = mensaje,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
+        // GOOGLE MAPS
         GoogleMap(
             modifier = Modifier.weight(1f),
             cameraPositionState = cameraPositionState,
@@ -345,13 +421,21 @@ fun MapScreen() {
                 buscarDireccionInversa(posicion)
             }
         ) {
+
+            // MARCADOR DE UBICACION ACTUAL
             currentLocation?.let { location ->
+
+                val markerState = rememberUpdatedMarkerState(
+                    position = location
+                )
+
                 Marker(
-                    state = rememberUpdatedMarkerState(position = location),
+                    state = markerState,
                     title = stringResource(R.string.my_location)
                 )
             }
 
+            // POLYLINE CON LINEAS RECTAS
             if (puntosRecorridos.size >= 2) {
                 Polyline(
                     points = puntosRecorridos.toList(),
@@ -360,36 +444,37 @@ fun MapScreen() {
                 )
             }
 
+            // MARCADOR DE DIRECCION BUSCADA
             ubicacionBuscada?.let { posicion ->
+
+                val markerBuscado = rememberUpdatedMarkerState(
+                    position = posicion
+                )
+
                 Marker(
-                    state = rememberUpdatedMarkerState(position = posicion),
+                    state = markerBuscado,
                     title = nombreUbicacion
                 )
             }
 
+            // MARCADOR DE LONGCLICK - GEOCODER INVERSO
             ubicacionLongClick?.let { posicion ->
 
-                val markerState = rememberUpdatedMarkerState(
+                val markerLongClick = rememberUpdatedMarkerState(
                     position = posicion
                 )
-                val coordenadas = stringResource(
-                    R.string.coordinates_label,
-                    posicion.latitude,
-                    posicion.longitude
-                )
-                val titulo = direccionLongClick ?: coordenadas
 
                 Marker(
-                    state = markerState,
-                    title = titulo,
-                    snippet = coordenadas
+                    state = markerLongClick,
+                    title = direccionLongClick,
+                    snippet = stringResource(
+                        R.string.coordinates_label,
+                        posicion.latitude,
+                        posicion.longitude
+                    )
                 )
-
-                // Abre (o refresca) la ventana de información con la dirección
-                LaunchedEffect(posicion, titulo) {
-                    markerState.showInfoWindow()
-                }
             }
         }
     }
+
 }
