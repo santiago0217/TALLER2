@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -144,37 +145,93 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             }
         }
 
-        OutlinedTextField(
-            value = viewModel.direccion,
-            onValueChange = { viewModel.onDireccionChange(it) },
-            label = { Text(stringResource(R.string.search_address)) },
-            placeholder = { Text(stringResource(R.string.address_example)) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { buscarDireccion() })
-        )
-
-        Button(
-            onClick = { buscarDireccion() },
-            enabled = !viewModel.buscando && viewModel.direccion.isNotBlank(),
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(bottom = 8.dp)
+        // BUSCADOR DE DIRECCIONES
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(text = stringResource(R.string.search_button))
+            Column(
+                modifier = Modifier.padding(
+                    horizontal = 12.dp,
+                    vertical = 8.dp
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+
+                OutlinedTextField(
+                    value = viewModel.direccion,
+                    onValueChange = { viewModel.onDireccionChange(it) },
+                    label = {
+                        Text(stringResource(R.string.search_address))
+                    },
+                    placeholder = {
+                        Text(stringResource(R.string.address_example))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor =
+                            MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor =
+                            MaterialTheme.colorScheme.onSurface,
+
+                        focusedContainerColor =
+                            MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor =
+                            MaterialTheme.colorScheme.surface,
+
+                        focusedBorderColor =
+                            MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor =
+                            MaterialTheme.colorScheme.outline,
+
+                        focusedLabelColor =
+                            MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+
+                        focusedPlaceholderColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        unfocusedPlaceholderColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+
+                        cursorColor =
+                            MaterialTheme.colorScheme.primary
+                    ),
+
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            buscarDireccion()
+                        }
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        buscarDireccion()
+                    },
+                    enabled = viewModel.direccion.isNotBlank() && !viewModel.buscando
+                ) {
+                    Text(stringResource(R.string.search_button))
+                }
+
+                viewModel.mensajeBusqueda?.let { mensaje ->
+                    Text(
+                        text = mensaje,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
         }
 
-        viewModel.mensajeBusqueda?.let { mensaje ->
-            Text(
-                text = mensaje,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
+        // GOOGLE MAPS
         GoogleMap(
             modifier = Modifier.weight(1f),
             cameraPositionState = cameraPositionState,
