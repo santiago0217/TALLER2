@@ -6,9 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -17,6 +14,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import com.icm2630.taller2.data.CameraUiState
 import java.io.File
 
 class CameraViewModel(
@@ -24,15 +26,14 @@ class CameraViewModel(
     private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
 
-    // false = Foto, true = Video
-    var isVideo by mutableStateOf(savedStateHandle[KEY_IS_VIDEO] ?: false)
-        private set
-
-    // Contenido seleccionado o capturado
-    var mediaUri by mutableStateOf<Uri?>(savedStateHandle[KEY_MEDIA_URI])
-        private set
-    var mediaIsVideo by mutableStateOf(savedStateHandle[KEY_MEDIA_IS_VIDEO] ?: false)
-        private set
+    private val _uiState = MutableStateFlow(
+        CameraUiState(
+            isVideo = savedStateHandle[KEY_IS_VIDEO] ?: false,
+            mediaUri = savedStateHandle[KEY_MEDIA_URI],
+            mediaIsVideo = savedStateHandle[KEY_MEDIA_IS_VIDEO] ?: false
+        )
+    )
+    val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
 
     // Archivo temporal de la camara. Se guarda en el SavedStateHandle porque
     // el sistema puede destruir la app mientras la camara esta abierta
@@ -42,14 +43,6 @@ class CameraViewModel(
             savedStateHandle[KEY_PENDING_URI] = value
         }
 
-    // Foto cargada para mostrar
-    var bitmap by mutableStateOf<Bitmap?>(null)
-        private set
-
-    // Se activa cuando el usuario niega el permiso de camara
-    var permisoDenegado by mutableStateOf(false)
-        private set
-
     private var cargaBitmap: Job? = null
 
     init {
@@ -58,12 +51,12 @@ class CameraViewModel(
     }
 
     fun cambiarModo(video: Boolean) {
-        isVideo = video
+        _uiState.update { it.copy(isVideo = video) }
         savedStateHandle[KEY_IS_VIDEO] = video
     }
 
     fun onPermisoCamara(concedido: Boolean) {
-        permisoDenegado = !concedido
+        _uiState.update { it.copy(permisoDenegado = !concedido) }
     }
 
     // Crea el archivo temporal donde la app de camara guarda la captura
@@ -73,7 +66,7 @@ class CameraViewModel(
         val folder = File(context.cacheDir, CAMERA_FOLDER)
         folder.mkdirs()
 
-        val extension = if (isVideo) ".mp4" else ".jpg"
+        val extension = if (_uiState.value.isVideo) ".mp4" else ".jpg"
 
         val file = File.createTempFile(
             "captura_",
@@ -103,8 +96,8 @@ class CameraViewModel(
         val uri = pendingUri
         pendingUri = null
 
-        if (success) {
-            val anterior = mediaUri
+        if (success && uri != null) {
+            val anterior = _uiState.value.mediaUri
             mostrarMedia(uri, esVideo)
             borrarCaptura(anterior)
         } else {
@@ -115,32 +108,35 @@ class CameraViewModel(
 
     fun onMediaSeleccionada(uri: Uri?) {
         if (uri != null) {
-            val anterior = mediaUri
-            mostrarMedia(uri, esVideo = isVideo)
+            val anterior = _uiState.value.mediaUri
+            mostrarMedia(uri, esVideo = _uiState.value.isVideo)
             borrarCaptura(anterior)
         }
     }
 
     private fun mostrarMedia(uri: Uri?, esVideo: Boolean) {
-        mediaUri = uri
-        mediaIsVideo = esVideo
+        _uiState.update { it.copy(mediaUri = uri, mediaIsVideo = esVideo, bitmap = null) }
         savedStateHandle[KEY_MEDIA_URI] = uri
         savedStateHandle[KEY_MEDIA_IS_VIDEO] = esVideo
         cargarBitmap()
     }
 
     private fun cargarBitmap() {
-        val uri = mediaUri
-        val esVideo = mediaIsVideo
+        val uri = _uiState.value.mediaUri
+        val esVideo = _uiState.value.mediaIsVideo
 
         cargaBitmap?.cancel()
         cargaBitmap = viewModelScope.launch {
-            bitmap = if (uri != null && !esVideo) {
+            val foto = if (uri != null && !esVideo) {
                 withContext(Dispatchers.IO) {
                     runCatching { decodificarFoto(uri) }.getOrNull()
                 }
             } else {
                 null
+            }
+            // Evitar mostrar una carga anterior cuando el usuario cambia de archivo.
+            if (_uiState.value.mediaUri == uri && _uiState.value.mediaIsVideo == esVideo) {
+                _uiState.update { it.copy(bitmap = foto) }
             }
         }
     }
@@ -193,10 +189,10 @@ class CameraViewModel(
     }
 
     override fun onCleared() {
-        // Al salir de la pantalla ya no se necesitan las capturas temporales
-        if (pendingUri == null) {
-            File(getApplication<Application>().cacheDir, CAMERA_FOLDER).deleteRecursively()
-        }
+        super.onCleared()
+        // No borrar toda la carpeta: la URI puede seguir necesitandose tras recrear
+        // la pantalla o volver de la app de camara.
+        cargaBitmap?.cancel()
     }
 
     private companion object {

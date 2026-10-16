@@ -11,11 +11,6 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Geocoder
 import android.os.Looper
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -28,7 +23,12 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.icm2630.taller2.R
+import com.icm2630.taller2.data.MapUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -43,15 +43,9 @@ class MapViewModel(
     // SENSOR DE LUMINOSIDAD
     private val sensorManager =
         application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    val lightSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
+    private val lightSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
 
-    var luminosidad by mutableFloatStateOf(100f)
-        private set
     private var sensorIniciado = false
-
-    // Usa dos umbrales para que el estilo no parpadee cuando la luz ronda los 50 lux
-    var modoOscuro by mutableStateOf(false)
-        private set
 
     val estiloOscuro: MapStyleOptions =
         MapStyleOptions.loadRawResourceStyle(application, R.raw.map_dark)
@@ -60,11 +54,17 @@ class MapViewModel(
         override fun onSensorChanged(event: SensorEvent) {
             if (event.sensor.type == Sensor.TYPE_LIGHT) {
                 val lux = event.values[0]
-                luminosidad = lux
-                modoOscuro = when {
-                    !sensorIniciado -> lux < UMBRAL_LUX
-                    modoOscuro -> lux < UMBRAL_LUX_CLARO
-                    else -> lux < UMBRAL_LUX_OSCURO
+                _uiState.update {
+                    it.copy(
+                        luminosidad = lux,
+                        // Usa dos umbrales para que el estilo no parpadee
+                        // cuando la luz ronda los 50 lux
+                        modoOscuro = when {
+                            !sensorIniciado -> lux < UMBRAL_LUX
+                            it.modoOscuro -> lux < UMBRAL_LUX_CLARO
+                            else -> lux < UMBRAL_LUX_OSCURO
+                        }
+                    )
                 }
                 sensorIniciado = true
             }
@@ -93,6 +93,15 @@ class MapViewModel(
     private val fusedLocationClient =
         LocationServices.getFusedLocationProviderClient(application)
 
+    private val _uiState = MutableStateFlow(
+        MapUiState(
+            sensorDisponible = lightSensor != null,
+            permissionGranted = hasLocationPermission(),
+            direccion = savedStateHandle.get<String>(KEY_DIRECCION) ?: ""
+        )
+    )
+    val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
+
     fun hasLocationPermission(): Boolean {
         val fine = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
@@ -103,30 +112,30 @@ class MapViewModel(
         return fine || coarse
     }
 
-    var permissionGranted by mutableStateOf(hasLocationPermission())
-        private set
-
     fun onPermisosRespondidos() {
-        permissionGranted = hasLocationPermission()
+        _uiState.update { it.copy(permissionGranted = hasLocationPermission()) }
     }
 
-    var currentLocation by mutableStateOf<LatLng?>(null)
-        private set
-    val puntosRecorridos = mutableStateListOf<LatLng>()
-    var cameraCentered by mutableStateOf(false)
-        private set
+    // La camara del mapa se centra solo con la primera ubicacion recibida
+    private var cameraCentered = false
 
-    fun marcarCamaraCentrada() {
+    fun debeCentrarCamara(): Boolean {
+        if (cameraCentered) return false
         cameraCentered = true
+        return true
     }
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             result.lastLocation?.let { location ->
                 val nuevaUbicacion = LatLng(location.latitude, location.longitude)
-                currentLocation = nuevaUbicacion
-                if (puntosRecorridos.isEmpty() || puntosRecorridos.last() != nuevaUbicacion) {
-                    puntosRecorridos.add(nuevaUbicacion)
+                _uiState.update {
+                    val puntos = if (it.puntosRecorridos.lastOrNull() != nuevaUbicacion) {
+                        it.puntosRecorridos + nuevaUbicacion
+                    } else {
+                        it.puntosRecorridos
+                    }
+                    it.copy(currentLocation = nuevaUbicacion, puntosRecorridos = puntos)
                 }
             }
         }
@@ -134,7 +143,7 @@ class MapViewModel(
 
     @SuppressLint("MissingPermission")
     fun iniciarUbicacion(): Boolean {
-        if (!permissionGranted || !hasLocationPermission()) return false
+        if (!_uiState.value.permissionGranted || !hasLocationPermission()) return false
 
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY, 5000L
@@ -151,35 +160,20 @@ class MapViewModel(
     }
 
     // GEOCODER: BUSQUEDA DE DIRECCIONES
-    var direccion by mutableStateOf(savedStateHandle.get<String>(KEY_DIRECCION) ?: "")
-        private set
-    var ubicacionBuscada by mutableStateOf<LatLng?>(null)
-        private set
-    var nombreUbicacion by mutableStateOf("")
-        private set
-    var mensajeBusqueda by mutableStateOf<String?>(null)
-        private set
-    var buscando by mutableStateOf(false)
-        private set
-
-    val puedeBuscar: Boolean
-        get() = direccion.trim().isNotEmpty() && !buscando
-
     fun onDireccionChange(valor: String) {
-        direccion = valor
+        _uiState.update { it.copy(direccion = valor) }
         savedStateHandle[KEY_DIRECCION] = valor
     }
 
     // Se ejecuta en el scope de la pantalla para poder animar la camara del mapa
     suspend fun buscarDireccion(onEncontrada: suspend (LatLng) -> Unit) {
-        val textoBuscado = direccion.trim()
-        if (textoBuscado.isEmpty() || buscando) return
+        if (!_uiState.value.puedeBuscar) return
+        val textoBuscado = _uiState.value.direccion.trim()
 
-        buscando = true
-        mensajeBusqueda = null
+        _uiState.update { it.copy(buscando = true, mensajeBusqueda = null) }
         try {
             if (!Geocoder.isPresent()) {
-                mensajeBusqueda = context.getString(R.string.address_search_error)
+                mostrarMensajeBusqueda(R.string.address_search_error)
                 return
             }
 
@@ -191,31 +185,30 @@ class MapViewModel(
             val lugar = resultados?.firstOrNull()
             if (lugar != null) {
                 val posicion = LatLng(lugar.latitude, lugar.longitude)
-                ubicacionBuscada = posicion
-                nombreUbicacion = textoBuscado
+                _uiState.update {
+                    it.copy(ubicacionBuscada = posicion, nombreUbicacion = textoBuscado)
+                }
                 onEncontrada(posicion)
             } else {
-                mensajeBusqueda = context.getString(R.string.address_not_found)
+                mostrarMensajeBusqueda(R.string.address_not_found)
             }
         } catch (e: Exception) {
-            mensajeBusqueda = context.getString(R.string.address_search_error)
+            mostrarMensajeBusqueda(R.string.address_search_error)
         } finally {
-            buscando = false
+            _uiState.update { it.copy(buscando = false) }
         }
     }
 
+    private fun mostrarMensajeBusqueda(mensaje: Int) {
+        _uiState.update { it.copy(mensajeBusqueda = context.getString(mensaje)) }
+    }
+
     // GEOCODER INVERSO: DIRECCION A PARTIR DE UNA POSICION
-    var ubicacionLongClick by mutableStateOf<LatLng?>(null)
-        private set
-
-    // null mientras el Geocoder todavía no responde
-    var direccionLongClick by mutableStateOf<String?>(null)
-        private set
-
     fun buscarDireccionInversa(posicion: LatLng) {
 
-        ubicacionLongClick = posicion
-        direccionLongClick = null
+        _uiState.update {
+            it.copy(ubicacionLongClick = posicion, direccionLongClick = null)
+        }
 
         viewModelScope.launch {
 
@@ -248,8 +241,12 @@ class MapViewModel(
             }
 
             // Evita actualizar el marcador si hubo otro LongClick
-            if (ubicacionLongClick == posicion) {
-                direccionLongClick = direccionEncontrada
+            _uiState.update {
+                if (it.ubicacionLongClick == posicion) {
+                    it.copy(direccionLongClick = direccionEncontrada)
+                } else {
+                    it
+                }
             }
         }
     }

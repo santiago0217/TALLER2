@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+
 import com.icm2630.taller2.R
 import com.icm2630.taller2.ui.components.ActionButton
 import com.icm2630.taller2.ui.components.ErrorMessage
@@ -27,10 +28,9 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
 
     val context = LocalContext.current
 
-    val isVideo = viewModel.isVideo
-    val mediaUri = viewModel.mediaUri
-    val mediaIsVideo = viewModel.mediaIsVideo
-    val bitmap = viewModel.bitmap
+    // La UI observa el unico estado publicado por el ViewModel.
+    val uiState by viewModel.uiState.collectAsState()
+    val isVideo = uiState.isVideo
 
     // Tomar foto usando la app de camara
     val takePictureLauncher =
@@ -61,7 +61,7 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
 
         val uri = viewModel.crearUriCaptura()
 
-        if (viewModel.isVideo) {
+        if (uiState.isVideo) {
             captureVideoLauncher.launch(uri)
         } else {
             takePictureLauncher.launch(uri)
@@ -103,9 +103,9 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
 
         // Vista previa de tamaño fijo
         MediaPreview(
-            mediaUri = mediaUri,
-            isVideo = mediaIsVideo,
-            bitmap = bitmap,
+            mediaUri = uiState.mediaUri,
+            isVideo = uiState.mediaIsVideo,
+            bitmap = uiState.bitmap,
             emptyText = stringResource(R.string.no_media_selected),
             imageDescription = stringResource(R.string.photo)
         )
@@ -173,7 +173,7 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
             )
         }
 
-        if (viewModel.permisoDenegado) {
+        if (uiState.permisoDenegado) {
 
             Spacer(Modifier.height(16.dp))
 

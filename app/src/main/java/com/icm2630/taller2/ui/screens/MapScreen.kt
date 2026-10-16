@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -41,7 +42,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         onDispose { viewModel.detenerSensor() }
     }
 
-    val modoOscuro = viewModel.modoOscuro
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val modoOscuro = uiState.modoOscuro
     val mapProperties = remember(modoOscuro, viewModel.estiloOscuro) {
         MapProperties(mapStyleOptions = if (modoOscuro) viewModel.estiloOscuro else null)
     }
@@ -75,7 +78,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         onPauseOrDispose { }
     }
 
-    DisposableEffect(viewModel.permissionGranted, viewModel) {
+    DisposableEffect(uiState.permissionGranted, viewModel) {
         if (!viewModel.iniciarUbicacion()) {
             onDispose { }
         } else {
@@ -83,12 +86,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
-    val currentLocation = viewModel.currentLocation
+    val currentLocation = uiState.currentLocation
 
     LaunchedEffect(currentLocation) {
         val location = currentLocation
-        if (location != null && !viewModel.cameraCentered) {
-            viewModel.marcarCamaraCentrada()
+        if (location != null && viewModel.debeCentrarCamara()) {
             cameraPositionState.animate(
                 CameraUpdateFactory.newLatLngZoom(location, 16f)
             )
@@ -97,7 +99,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     // GEOCODER: BUSQUEDA DE DIRECCIONES
     fun buscarDireccion() {
-        if (!viewModel.puedeBuscar) return
+        if (!viewModel.uiState.value.puedeBuscar) return
 
         keyboardController?.hide()
         searchScope.launch {
@@ -110,7 +112,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (!viewModel.permissionGranted) {
+        if (!uiState.permissionGranted) {
             ErrorMessage(
                 text = stringResource(R.string.location_permission),
                 modifier = Modifier.padding(16.dp)
@@ -119,10 +121,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
         // INFORMACION DEL SENSOR DE LUMINOSIDAD
         InfoCard {
-            if (viewModel.lightSensor == null) {
+            if (!uiState.sensorDisponible) {
                 Text(text = stringResource(R.string.light_sensor_unavailable))
             } else {
-                Text(text = stringResource(R.string.light_sensor_value, viewModel.luminosidad))
+                Text(text = stringResource(R.string.light_sensor_value, uiState.luminosidad))
                 Text(
                     text = stringResource(
                         if (modoOscuro) R.string.dark_map_mode else R.string.light_map_mode
@@ -140,7 +142,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         ) {
 
             SearchField(
-                value = viewModel.direccion,
+                value = uiState.direccion,
                 onValueChange = { viewModel.onDireccionChange(it) },
                 label = stringResource(R.string.search_address),
                 placeholder = stringResource(R.string.address_example),
@@ -155,10 +157,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 onClick = {
                     buscarDireccion()
                 },
-                enabled = viewModel.direccion.isNotBlank() && !viewModel.buscando
+                enabled = uiState.direccion.isNotBlank() && !uiState.buscando
             )
 
-            viewModel.mensajeBusqueda?.let { mensaje ->
+            uiState.mensajeBusqueda?.let { mensaje ->
                 ErrorMessage(
                     text = mensaje,
                     modifier = Modifier.padding(top = 8.dp)
@@ -182,22 +184,22 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 )
             }
 
-            if (viewModel.puntosRecorridos.size >= 2) {
+            if (uiState.puntosRecorridos.size >= 2) {
                 Polyline(
-                    points = viewModel.puntosRecorridos.toList(),
+                    points = uiState.puntosRecorridos,
                     color = Color.Blue,
                     width = 8f
                 )
             }
 
-            viewModel.ubicacionBuscada?.let { posicion ->
+            uiState.ubicacionBuscada?.let { posicion ->
                 MapMarker(
                     position = posicion,
-                    title = viewModel.nombreUbicacion
+                    title = uiState.nombreUbicacion
                 )
             }
 
-            viewModel.ubicacionLongClick?.let { posicion ->
+            uiState.ubicacionLongClick?.let { posicion ->
 
                 val coordenadas = stringResource(
                     R.string.coordinates_label,
@@ -208,7 +210,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 // Abre (o refresca) la ventana de información con la dirección
                 MapMarker(
                     position = posicion,
-                    title = viewModel.direccionLongClick ?: coordenadas,
+                    title = uiState.direccionLongClick ?: coordenadas,
                     snippet = coordenadas,
                     showInfoWindow = true
                 )
