@@ -2,7 +2,7 @@
   {
     "elementType": "geometry",
     "stylers": [
-      { "color": "#242f3e" }
+      { "color": "#3d5576" }
     ]
   },
   {
@@ -63,7 +63,7 @@
     "featureType": "water",
     "elementType": "geometry",
     "stylers": [
-      { "color": "#17263c" }
+      { "color": "#8ac7ff" }
     ]
   }
 ]

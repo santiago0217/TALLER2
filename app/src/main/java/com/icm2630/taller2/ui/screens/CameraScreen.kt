@@ -2,9 +2,6 @@ package com.icm2630.taller2.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,58 +21,26 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.icm2630.taller2.R
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.File
+import com.icm2630.taller2.ui.viewmodel.CameraViewModel
 
 @Composable
-fun CameraScreen() {
+fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
 
     val context = LocalContext.current
 
-    // false = Foto, true = Video
-    var isVideo by remember { mutableStateOf(false) }
-
-    // Contenido seleccionado o capturado
-    var mediaUri by remember { mutableStateOf<Uri?>(null) }
-    var mediaIsVideo by remember { mutableStateOf(false) }
-
-    // Archivo temporal de la camara
-    var pendingUri by remember { mutableStateOf<Uri?>(null) }
-
-    // Foto cargada para mostrar
-    val bitmap by produceState<Bitmap?>(
-        initialValue = null,
-        key1 = mediaUri,
-        key2 = mediaIsVideo
-    ) {
-        val uri = mediaUri
-
-        value = if (uri != null && !mediaIsVideo) {
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openInputStream(uri)?.use {
-                        BitmapFactory.decodeStream(it)
-                    }
-                }.getOrNull()
-            }
-        } else {
-            null
-        }
-    }
+    val isVideo = viewModel.isVideo
+    val mediaUri = viewModel.mediaUri
+    val mediaIsVideo = viewModel.mediaIsVideo
+    val bitmap = viewModel.bitmap
 
     // Tomar foto usando la app de camara
     val takePictureLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.TakePicture()
         ) { success ->
-
-            if (success) {
-                mediaUri = pendingUri
-                mediaIsVideo = false
-            }
+            viewModel.onFotoTomada(success)
         }
 
     // Grabar video usando la app de camara
@@ -83,11 +48,7 @@ fun CameraScreen() {
         rememberLauncherForActivityResult(
             ActivityResultContracts.CaptureVideo()
         ) { success ->
-
-            if (success) {
-                mediaUri = pendingUri
-                mediaIsVideo = true
-            }
+            viewModel.onVideoGrabado(success)
         }
 
     // Seleccionar foto o video de la galeria
@@ -95,36 +56,15 @@ fun CameraScreen() {
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickVisualMedia()
         ) { uri ->
-
-            if (uri != null) {
-                mediaUri = uri
-                mediaIsVideo = isVideo
-            }
+            viewModel.onMediaSeleccionada(uri)
         }
 
     // Funcion para abrir la camara
     fun openCamera() {
 
-        val folder = File(context.cacheDir, "camera")
-        folder.mkdirs()
+        val uri = viewModel.crearUriCaptura()
 
-        val extension = if (isVideo) ".mp4" else ".jpg"
-
-        val file = File.createTempFile(
-            "captura_",
-            extension,
-            folder
-        )
-
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-
-        pendingUri = uri
-
-        if (isVideo) {
+        if (viewModel.isVideo) {
             captureVideoLauncher.launch(uri)
         } else {
             takePictureLauncher.launch(uri)
@@ -136,6 +76,8 @@ fun CameraScreen() {
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { granted ->
+
+            viewModel.onPermisoCamara(granted)
 
             if (granted) {
                 openCamera()
@@ -163,7 +105,7 @@ fun CameraScreen() {
             Switch(
                 checked = isVideo,
                 onCheckedChange = {
-                    isVideo = it
+                    viewModel.cambiarModo(it)
                 }
             )
 
@@ -193,7 +135,7 @@ fun CameraScreen() {
                 }
 
                 mediaIsVideo -> {
-                    val uri = mediaUri!!
+                    val uri = mediaUri
 
                     key(uri) {
                         AndroidView(
@@ -221,7 +163,7 @@ fun CameraScreen() {
 
                 bitmap != null -> {
                     Image(
-                        bitmap = bitmap!!.asImageBitmap(),
+                        bitmap = bitmap.asImageBitmap(),
                         contentDescription = stringResource(
                             R.string.photo
                         ),
@@ -257,6 +199,7 @@ fun CameraScreen() {
                             permission
                         ) == PackageManager.PERMISSION_GRANTED
                     ) {
+                        viewModel.onPermisoCamara(true)
                         openCamera()
                     } else {
                         permissionLauncher.launch(permission)
@@ -302,6 +245,18 @@ fun CameraScreen() {
                     )
                 )
             }
+        }
+
+        if (viewModel.permisoDenegado) {
+
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                text = stringResource(
+                    R.string.camera_permission_denied
+                ),
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }
