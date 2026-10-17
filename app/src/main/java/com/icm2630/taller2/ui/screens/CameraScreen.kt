@@ -18,13 +18,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 import com.icm2630.taller2.R
 import com.icm2630.taller2.ui.components.ActionButton
+import com.icm2630.taller2.ui.components.BackButton
 import com.icm2630.taller2.ui.components.ErrorMessage
 import com.icm2630.taller2.ui.components.LabeledSwitch
 import com.icm2630.taller2.ui.components.MediaPreview
 import com.icm2630.taller2.ui.viewmodel.CameraViewModel
 
 @Composable
-fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
+fun CameraScreen(
+    onBack: () -> Unit,
+    viewModel: CameraViewModel = viewModel()
+) {
 
     val context = LocalContext.current
 
@@ -81,107 +85,120 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
             }
         }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
 
-        // Selector Foto / Video
-        LabeledSwitch(
-            startLabel = stringResource(R.string.photo),
-            endLabel = stringResource(R.string.video),
-            checked = isVideo,
-            onCheckedChange = {
-                viewModel.cambiarModo(it)
-            }
+        // Volver a la pantalla principal
+        BackButton(
+            text = stringResource(R.string.back_home),
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(8.dp)
         )
 
-        Spacer(Modifier.height(30.dp))
-
-        // Vista previa de tamaño fijo
-        MediaPreview(
-            mediaUri = uiState.mediaUri,
-            isVideo = uiState.mediaIsVideo,
-            bitmap = uiState.bitmap,
-            emptyText = stringResource(R.string.no_media_selected),
-            imageDescription = stringResource(R.string.photo)
-        )
-
-        Spacer(Modifier.height(30.dp))
-
-        // Botones principales
-        Row(
-            horizontalArrangement =
-                Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
 
-            ActionButton(
-                text = stringResource(
-                    if (isVideo)
-                        R.string.record_video
-                    else
-                        R.string.take_photo
-                ),
-                onClick = {
-
-                    val permission =
-                        Manifest.permission.CAMERA
-
-                    if (
-                        ContextCompat.checkSelfPermission(
-                            context,
-                            permission
-                        ) == PackageManager.PERMISSION_GRANTED
-                    ) {
-                        viewModel.onPermisoCamara(true)
-                        openCamera()
-                    } else {
-                        permissionLauncher.launch(permission)
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(24.dp)
+            // Selector Foto / Video
+            LabeledSwitch(
+                startLabel = stringResource(R.string.photo),
+                endLabel = stringResource(R.string.video),
+                checked = isVideo,
+                onCheckedChange = {
+                    viewModel.cambiarModo(it)
+                }
             )
 
-            ActionButton(
-                text = stringResource(
-                    if (isVideo)
-                        R.string.select_video
-                    else
-                        R.string.select_photo
-                ),
-                onClick = {
+            Spacer(Modifier.height(30.dp))
 
-                    val mediaType = if (isVideo) {
-                        ActivityResultContracts
-                            .PickVisualMedia.VideoOnly
-                    } else {
-                        ActivityResultContracts
-                            .PickVisualMedia.ImageOnly
-                    }
-
-                    galleryLauncher.launch(
-                        PickVisualMediaRequest(mediaType)
-                    )
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(24.dp)
+            // Vista previa de tamaño fijo
+            MediaPreview(
+                mediaUri = uiState.mediaUri,
+                isVideo = uiState.mediaIsVideo,
+                bitmap = uiState.bitmap,
+                emptyText = stringResource(R.string.no_media_selected),
+                imageDescription = stringResource(R.string.photo)
             )
-        }
 
-        if (uiState.permisoDenegado) {
+            Spacer(Modifier.height(30.dp))
 
-            Spacer(Modifier.height(16.dp))
+            // Botones principales
+            Row(
+                horizontalArrangement =
+                    Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
 
-            ErrorMessage(
-                text = stringResource(
-                    R.string.camera_permission_denied
+                ActionButton(
+                    text = stringResource(
+                        if (isVideo)
+                            R.string.record_video
+                        else
+                            R.string.take_photo
+                    ),
+                    onClick = {
+
+                        val permission =
+                            Manifest.permission.CAMERA
+
+                        if (
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                permission
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            viewModel.onPermisoCamara(true)
+                            openCamera()
+                        } else {
+                            permissionLauncher.launch(permission)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp)
                 )
-            )
+
+                ActionButton(
+                    text = stringResource(
+                        if (isVideo)
+                            R.string.select_video
+                        else
+                            R.string.select_photo
+                    ),
+                    onClick = {
+
+                        val mediaType = if (isVideo) {
+                            ActivityResultContracts
+                                .PickVisualMedia.VideoOnly
+                        } else {
+                            ActivityResultContracts
+                                .PickVisualMedia.ImageOnly
+                        }
+
+                        galleryLauncher.launch(
+                            PickVisualMediaRequest(mediaType)
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp)
+                )
+            }
+
+            if (uiState.permisoDenegado) {
+
+                Spacer(Modifier.height(16.dp))
+
+                ErrorMessage(
+                    text = stringResource(
+                        R.string.camera_permission_denied
+                    )
+                )
+            }
         }
     }
 }

@@ -4,11 +4,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
@@ -43,6 +46,28 @@ fun MenuButton(
         OutlinedButton(onClick = onClick, modifier = buttonModifier) { content() }
     } else {
         Button(onClick = onClick, modifier = buttonModifier) { content() }
+    }
+}
+
+// Boton con flecha para volver a la pantalla principal
+@Composable
+fun BackButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = null
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Text(text)
     }
 }
 

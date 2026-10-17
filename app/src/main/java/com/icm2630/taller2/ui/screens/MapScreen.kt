@@ -23,6 +23,7 @@ import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.icm2630.taller2.R
 import com.icm2630.taller2.ui.components.ActionButton
+import com.icm2630.taller2.ui.components.BackButton
 import com.icm2630.taller2.ui.components.ErrorMessage
 import com.icm2630.taller2.ui.components.InfoCard
 import com.icm2630.taller2.ui.components.MapMarker
@@ -31,7 +32,10 @@ import com.icm2630.taller2.ui.viewmodel.MapViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun MapScreen(viewModel: MapViewModel = viewModel()) {
+fun MapScreen(
+    onBack: () -> Unit,
+    viewModel: MapViewModel = viewModel()
+) {
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val searchScope = rememberCoroutineScope()
@@ -112,6 +116,16 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+
+        // Volver a la pantalla principal
+        BackButton(
+            text = stringResource(R.string.back_home),
+            onClick = onBack,
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(start = 8.dp)
+        )
+
         if (!uiState.permissionGranted) {
             ErrorMessage(
                 text = stringResource(R.string.location_permission),

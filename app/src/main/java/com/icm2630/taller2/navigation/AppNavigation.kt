@@ -24,6 +24,13 @@ fun AppNavigation() {
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
+        // Vuelve a Home quitando todas las pantallas que esten encima
+        fun volverAHome() {
+            while (backStack.size > 1) {
+                backStack.removeAt(backStack.lastIndex)
+            }
+        }
+
         NavDisplay(
             backStack = backStack,
             onBack = {
@@ -50,11 +57,15 @@ fun AppNavigation() {
                 }
 
                 entry<Routes.Camera> {
-                    CameraScreen()
+                    CameraScreen(
+                        onBack = { volverAHome() }
+                    )
                 }
 
                 entry<Routes.Map> {
-                    MapScreen()
+                    MapScreen(
+                        onBack = { volverAHome() }
+                    )
                 }
             }
         )
